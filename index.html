@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Task Board — Public</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:Inter,system-ui,Arial;background:#f7fafc;margin:0;padding:18px;color:#111}
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    h1{margin:0;font-size:1.25rem}
+    .controls{margin:12px 0;display:flex;gap:8px;flex-wrap:wrap}
+    select,input{padding:8px;border-radius:6px;border:1px solid #ddd}
+    .card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.04);margin-bottom:10px}
+    .task{display:flex;justify-content:space-between;gap:10px;padding:8px;border-radius:8px;border:1px solid #eef2f7;background:#fff;margin-bottom:8px}
+    .task .left{flex:1}
+    .pill{padding:4px 8px;border-radius:999px;background:#eef6ff;color:#1e6fb8;border:1px solid #dbeffc;font-weight:600}
+    .prio-high{background:#fff0f0;color:#b81e2e;border:1px solid rgba(184,30,46,0.08)}
+    .prio-med{background:#fffaf0;color:#b86f1e;border:1px solid rgba(184,111,30,0.06)}
+    .prio-low{background:#f3fff6;color:#1f7a2e;border:1px solid rgba(31,122,46,0.06)}
+    .meta{font-size:0.85rem;color:#666;margin-top:6px}
+    .small{font-size:0.85rem;color:#666}
+    .empty{color:#666;padding:12px}
+    .refresh{font-size:0.9rem;color:#2b6cb0;cursor:pointer;background:transparent;border:none}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Task Board</h1>
+      <div class="small" id="summary">Loading…</div>
+    </header>
+
+    <div class="controls card">
+      <label>Employee
+        <select id="employeeFilter"><option value="__all">All</option></select>
+      </label>
+      <label>Priority
+        <select id="priorityFilter"><option value="__all">All</option><option>High</option><option>Medium</option><option>Low</option></select>
+      </label>
+      <label>Sort
+        <select id="sortSelect"><option value="dueAsc">Due ▲</option><option value="dueDesc">Due ▼</option><option value="priority">Priority</option></select>
+      </label>
+      <button id="refreshBtn" class="refresh">Refresh</button>
+      <div style="margin-left:auto" class="small">Edit data: <code>tasks.json</code> in this repo</div>
+    </div>
+
+    <div id="board"></div>
+    <div class="empty card" style="margin-top:8px">To update tasks: edit <code>tasks.json</code> in this repo (use GitHub web editor). Changes appear within ~10s after you save.</div>
+  </div>
+
+  <script>
+    const TASKS_URL = 'tasks.json'; // place tasks.json at repo root
+    const board = document.getElementById('board');
+    const summary = document.getElementById('summary');
+    const employeeFilter = document.getElementById('employeeFilter');
+    const priorityFilter = document.getElementById('priorityFilter');
+    const sortSelect = document.getElementById('sortSelect');
+    const refreshBtn = document.getElementById('refreshBtn');
+    let tasks = [];
+
+    function priorityOrder(p){ if(p==='High') return 0; if(p==='Medium') return 1; return 2; }
+    function fmt(d){ if(!d) return ''; const t=new Date(d); if(isNaN(t)) return d; return t.toLocaleDateString(); }
+
+    async function load(){
+      try{
+        const r = await fetch(TASKS_URL + '?ts=' + Date.now(), {cache: 'no-store'});
+        if(!r.ok) throw new Error('Failed to fetch tasks.json');
+        tasks = await r.json();
+      }catch(e){
+        console.warn(e);
+        tasks = [];
+      }
+      render();
+    }
+
+    function buildEmployeeOptions(){
+      const employees = Array.from(new Set(tasks.map(t=>t.employee).filter(Boolean))).sort();
+      employeeFilter.innerHTML = '<option value=\"__all\">All</option>';
+      employees.forEach(e=>{
+        const opt = document.createElement('option'); opt.value = e; opt.textContent = e; employeeFilter.appendChild(opt);
+      });
+    }
+
+    function render(){
+      buildEmployeeOptions();
+      let list = tasks.slice();
+
+      const emp = employeeFilter.value;
+      const prio = priorityFilter.value;
+      const sortBy = sortSelect.value;
+
+      if(emp && emp !== '__all') list = list.filter(t=> t.employee === emp);
+      if(prio && prio !== '__all') list = list.filter(t=> t.priority === prio);
+
+      list.sort((a,b)=>{
+        if(sortBy === 'dueAsc'){
+          if(!a.dueDate && !b.dueDate) return priorityOrder(a.priority) - priorityOrder(b.priority);
+          if(!a.dueDate) return 1;
+          if(!b.dueDate) return -1;
+          const d = new Date(a.dueDate) - new Date(b.dueDate);
+          if(d !== 0) return d;
+          return priorityOrder(a.priority) - priorityOrder(b.priority);
+        } else if(sortBy === 'dueDesc'){
+          if(!a.dueDate && !b.dueDate) return priorityOrder(b.priority) - priorityOrder(a.priority);
+          if(!a.dueDate) return 1;
+          if(!b.dueDate) return -1;
+          return new Date(b.dueDate) - new Date(a.dueDate);
+        } else {
+          return priorityOrder(a.priority) - priorityOrder(b.priority);
+        }
+      });
+
+      board.innerHTML = '';
+      if(list.length === 0){
+        board.innerHTML = '<div class=\"card empty\">No tasks found</div>';
+      } else {
+        list.forEach(t => {
+          const el = document.createElement('div');
+          el.className = 'task';
+          el.innerHTML = `
+            <div class="left">
+              <div style="font-weight:700">${escapeHtml(t.description)}</div>
+              <div style="margin-top:6px">
+                <span class="pill">${escapeHtml(t.employee)}</span>
+                <span style="margin-left:8px" class="${t.priority==='High'? 'prio-high' : t.priority==='Medium' ? 'prio-med' : 'prio-low'}" >${escapeHtml(t.priority||'Medium')}</span>
+                ${t.dueDate ? `<span style="margin-left:12px" class="small">Due: ${fmt(t.dueDate)}</span>` : ''}
+              </div>
+              <div class="meta">${t.note ? escapeHtml(t.note) : ''}</div>
+            </div>
+            <div class="small" style="white-space:nowrap">${t.completed ? '✔ Completed' : ''}</div>
+          `;
+          board.appendChild(el);
+        });
+      }
+
+      summary.textContent = `${tasks.length} total • ${tasks.filter(t=>!t.completed).length} open`;
+    }
+
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[m])); }
+
+    refreshBtn.addEventListener('click', ()=> load());
+    employeeFilter.addEventListener('change', render);
+    priorityFilter.addEventListener('change', render);
+    sortSelect.addEventListener('change', render);
+
+    // auto-refresh every 12s so viewers see updates quickly after you save tasks.json
+    setInterval(load, 12000);
+
+    load();
+  </script>
+</body>
+</html>

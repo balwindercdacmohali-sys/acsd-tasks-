@@ -1,0 +1,27 @@
+[
+  {
+    "id": "t1",
+    "employee": "Amit Kumar",
+    "description": "Prepare weekly report",
+    "dueDate": "2025-11-15",
+    "priority": "High",
+    "completed": false,
+    "note": "Include sales and inventory"
+  },
+  {
+    "id": "t2",
+    "employee": "Priya Sharma",
+    "description": "Update inventory list",
+    "dueDate": "2025-11-20",
+    "priority": "Medium",
+    "completed": false
+  },
+  {
+    "id": "t3",
+    "employee": "Aman",
+    "description": "Call supplier",
+    "dueDate": null,
+    "priority": "Low",
+    "completed": true
+  }
+]
