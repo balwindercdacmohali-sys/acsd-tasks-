@@ -2,152 +2,299 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Task Board — Public</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Employee Task Queue — Priority & Date Grouping</title>
   <style>
-    body{font-family:Inter,system-ui,Arial;background:#f7fafc;margin:0;padding:18px;color:#111}
-    .wrap{max-width:980px;margin:0 auto}
-    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    h1{margin:0;font-size:1.25rem}
-    .controls{margin:12px 0;display:flex;gap:8px;flex-wrap:wrap}
-    select,input{padding:8px;border-radius:6px;border:1px solid #ddd}
-    .card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.04);margin-bottom:10px}
-    .task{display:flex;justify-content:space-between;gap:10px;padding:8px;border-radius:8px;border:1px solid #eef2f7;background:#fff;margin-bottom:8px}
-    .task .left{flex:1}
-    .pill{padding:4px 8px;border-radius:999px;background:#eef6ff;color:#1e6fb8;border:1px solid #dbeffc;font-weight:600}
-    .prio-high{background:#fff0f0;color:#b81e2e;border:1px solid rgba(184,30,46,0.08)}
-    .prio-med{background:#fffaf0;color:#b86f1e;border:1px solid rgba(184,111,30,0.06)}
-    .prio-low{background:#f3fff6;color:#1f7a2e;border:1px solid rgba(31,122,46,0.06)}
-    .meta{font-size:0.85rem;color:#666;margin-top:6px}
-    .small{font-size:0.85rem;color:#666}
-    .empty{color:#666;padding:12px}
-    .refresh{font-size:0.9rem;color:#2b6cb0;cursor:pointer;background:transparent;border:none}
+    :root {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      --card-bg: #fff;
+      --muted: #666;
+      --accent: #2b6cb0;
+      --danger: #e53e3e;
+      --high: #ffe9e9;
+      --med: #fff7e6;
+      --low: #eefdf0;
+    }
+    body { margin:0; padding:18px; background:#f4f6f8; color:#111 }
+    .app { max-width:1000px; margin:0 auto }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px }
+    h1 { margin:0; font-size:1.25rem }
+    .card { background:var(--card-bg); padding:14px; border-radius:8px; box-shadow:0 1px 4px rgba(20,20,20,0.05); margin-bottom:12px }
+    form { display:grid; grid-template-columns: 1fr 1fr 160px 130px auto; gap:10px; align-items:end }
+    label { font-size:0.85rem; color:var(--muted); display:block; margin-bottom:6px }
+    input[type="text"], input[type="date"], select { width:100%; padding:8px 10px; border-radius:6px; border:1px solid #ddd; font-size:0.95rem; box-sizing:border-box }
+    button { padding:9px 12px; border-radius:6px; border:none; background:var(--accent); color:#fff; cursor:pointer; font-weight:600 }
+    button.ghost { background:transparent; color:var(--accent); border:1px solid #dbe9fb }
+    .controls { display:flex; gap:8px; align-items:center }
+    .task-list { margin-top:12px }
+    .task { display:flex; align-items:flex-start; gap:12px; padding:10px; border-radius:8px; border:1px solid #eef3f8; background:#fff; margin-bottom:8px }
+    .task.completed { opacity:0.65; text-decoration:line-through }
+    .task-left { flex:1 }
+    .task-meta { font-size:0.85rem; color:var(--muted); margin-top:6px; display:flex; gap:12px; flex-wrap:wrap }
+    .small { font-size:0.8rem; color:var(--muted) }
+    .pill { font-size:0.8rem; padding:4px 10px; border-radius:999px; background:#f0f8ff; color:var(--accent); border:1px solid #dbe9fb }
+    .priority-pill { font-weight:700; border-radius:6px; padding:4px 8px; font-size:0.8rem }
+    .prio-high { background:var(--high); color:var(--danger); border:1px solid rgba(229,62,62,0.12) }
+    .prio-med { background:var(--med); color:#c36a00; border:1px solid rgba(195,106,0,0.08) }
+    .prio-low { background:var(--low); color:#1f7a2e; border:1px solid rgba(31,122,46,0.06) }
+    .actions { display:flex; gap:6px }
+    .btn-danger { background:var(--danger) }
+    .group-title { margin:8px 0; font-weight:700 }
+    .group { margin-bottom:12px }
+    @media (max-width:900px){ form{grid-template-columns:1fr 1fr;} }
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="app">
     <header>
-      <h1>Task Board</h1>
+      <h1>Employee Task Queue — Priority & Date Grouping</h1>
       <div class="small" id="summary">Loading…</div>
     </header>
 
-    <div class="controls card">
-      <label>Employee
-        <select id="employeeFilter"><option value="__all">All</option></select>
-      </label>
-      <label>Priority
-        <select id="priorityFilter"><option value="__all">All</option><option>High</option><option>Medium</option><option>Low</option></select>
-      </label>
-      <label>Sort
-        <select id="sortSelect"><option value="dueAsc">Due ▲</option><option value="dueDesc">Due ▼</option><option value="priority">Priority</option></select>
-      </label>
-      <button id="refreshBtn" class="refresh">Refresh</button>
-      <div style="margin-left:auto" class="small">Edit data: <code>tasks.json</code> in this repo</div>
-    </div>
+    <section class="card">
+      <h2 style="margin-top:0;font-size:1rem">Add new task</h2>
+      <form id="taskForm">
+        <div>
+          <label for="employeeInput">Employee name</label>
+          <input type="text" id="employeeInput" placeholder="e.g. Amit Kumar" required />
+        </div>
+        <div>
+          <label for="taskInput">Task description</label>
+          <input type="text" id="taskInput" placeholder="What needs to be done?" required />
+        </div>
+        <div>
+          <label for="dueInput">Due date (last date)</label>
+          <input type="date" id="dueInput" />
+        </div>
+        <div>
+          <label for="prioritySelect">Priority</label>
+          <select id="prioritySelect">
+            <option value="Medium">Medium</option>
+            <option value="High">High</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+        <div class="controls">
+          <button type="submit">Add Task</button>
+          <button type="button" id="clearAll" class="ghost">Clear all</button>
+        </div>
+      </form>
+    </section>
 
-    <div id="board"></div>
-    <div class="empty card" style="margin-top:8px">To update tasks: edit <code>tasks.json</code> in this repo (use GitHub web editor). Changes appear within ~10s after you save.</div>
+    <section class="card">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div>
+          <label for="employeeFilter">Filter by employee</label>
+          <select id="employeeFilter"><option value="__all">All employees</option></select>
+        </div>
+
+        <div>
+          <label for="priorityFilter">Filter by priority</label>
+          <select id="priorityFilter"><option value="__all">All</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
+        </div>
+
+        <div>
+          <label for="sortSelect">Sort</label>
+          <select id="sortSelect">
+            <option value="dueAsc">Due date ▲ (default)</option>
+            <option value="dueDesc">Due date ▼</option>
+            <option value="priority">Priority (High → Low)</option>
+            <option value="employee">Employee name</option>
+            <option value="createdDesc">Newest first</option>
+          </select>
+        </div>
+
+        <div>
+          <label>&nbsp;</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:0.85rem"><input type="checkbox" id="groupByEmployee" /> Group by employee</label>
+            <button id="exportCsv" class="ghost" title="Download tasks as CSV">Export CSV</button>
+            <button id="importSample" class="ghost" title="Load sample tasks">Sample</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="task-list" id="taskList" aria-live="polite" style="margin-top:12px"></div>
+    </section>
+
+    <footer style="text-align:center;margin-top:12px;color:var(--muted);font-size:0.85rem">Saved to browser storage. You can export CSV to back up tasks.</footer>
   </div>
 
   <script>
-    const TASKS_URL = 'tasks.json'; // place tasks.json at repo root
-    const board = document.getElementById('board');
-    const summary = document.getElementById('summary');
+    const STORAGE_KEY = 'taskQueue_v2_priority';
+    function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+    function nowISO(){ return new Date().toISOString(); }
+    function formatDateISO(d){ if(!d) return ''; const dt = new Date(d); if(isNaN(dt)) return ''; return dt.toLocaleDateString(); }
+
+    const taskForm = document.getElementById('taskForm');
+    const employeeInput = document.getElementById('employeeInput');
+    const taskInput = document.getElementById('taskInput');
+    const dueInput = document.getElementById('dueInput');
+    const prioritySelect = document.getElementById('prioritySelect');
+    const taskListEl = document.getElementById('taskList');
     const employeeFilter = document.getElementById('employeeFilter');
     const priorityFilter = document.getElementById('priorityFilter');
     const sortSelect = document.getElementById('sortSelect');
-    const refreshBtn = document.getElementById('refreshBtn');
-    let tasks = [];
+    const groupByEmployeeCheckbox = document.getElementById('groupByEmployee');
+    const summary = document.getElementById('summary');
+    const clearAllBtn = document.getElementById('clearAll');
+    const exportCsvBtn = document.getElementById('exportCsv');
+    const importSampleBtn = document.getElementById('importSample');
 
-    function priorityOrder(p){ if(p==='High') return 0; if(p==='Medium') return 1; return 2; }
-    function fmt(d){ if(!d) return ''; const t=new Date(d); if(isNaN(t)) return d; return t.toLocaleDateString(); }
+    let tasks = loadTasks();
 
-    async function load(){
-      try{
-        const r = await fetch(TASKS_URL + '?ts=' + Date.now(), {cache: 'no-store'});
-        if(!r.ok) throw new Error('Failed to fetch tasks.json');
-        tasks = await r.json();
-      }catch(e){
-        console.warn(e);
-        tasks = [];
-      }
-      render();
+    taskForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const emp = employeeInput.value.trim();
+      const desc = taskInput.value.trim();
+      const due = dueInput.value ? new Date(dueInput.value).toISOString() : null;
+      const prio = prioritySelect.value || 'Medium';
+      if(!emp || !desc) return alert('Please provide employee name and task.');
+      const t = { id: uid(), employee: emp, description: desc, dueDate: due, priority: prio, completed: false, createdAt: nowISO(), updatedAt: nowISO(), completedAt: null };
+      tasks.push(t); // push to keep chronological unless sorted on render
+      saveTasks(tasks);
+      taskForm.reset();
+      employeeInput.focus();
+    });
+
+    clearAllBtn.addEventListener('click', ()=>{ if(!confirm('Clear ALL tasks from browser storage? This cannot be undone.')) return; tasks = []; saveTasks(tasks); });
+
+    function toggleComplete(id){ const t = tasks.find(x=>x.id===id); if(!t) return; t.completed = !t.completed; t.updatedAt = nowISO(); t.completedAt = t.completed ? nowISO() : null; saveTasks(tasks); }
+    function deleteTask(id){ if(!confirm('Delete this task?')) return; tasks = tasks.filter(x=>x.id!==id); saveTasks(tasks); }
+
+    function editTask(id){ const t = tasks.find(x=>x.id===id); if(!t) return; const newDesc = prompt('Edit task description', t.description); if(newDesc===null) return; t.description = newDesc.trim() || t.description; const newEmp = prompt('Edit employee name', t.employee); if(newEmp!==null) t.employee = newEmp.trim() || t.employee; const newDue = prompt('Edit due date (YYYY-MM-DD) — leave blank to remove', t.dueDate ? t.dueDate.slice(0,10) : ''); if(newDue!==null){ t.dueDate = newDue.trim() ? new Date(newDue.trim()).toISOString() : null; } const newPrio = prompt('Edit priority (High / Medium / Low)', t.priority); if(newPrio!==null){ const p = (newPrio||'').trim(); if(['High','Medium','Low'].includes(p)) t.priority = p; }
+      t.updatedAt = nowISO(); saveTasks(tasks);
     }
 
-    function buildEmployeeOptions(){
-      const employees = Array.from(new Set(tasks.map(t=>t.employee).filter(Boolean))).sort();
-      employeeFilter.innerHTML = '<option value=\"__all\">All</option>';
-      employees.forEach(e=>{
-        const opt = document.createElement('option'); opt.value = e; opt.textContent = e; employeeFilter.appendChild(opt);
-      });
-    }
+    function loadTasks(){ try{ const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ console.error(e); return []; } }
+    function saveTasks(ts){ localStorage.setItem(STORAGE_KEY, JSON.stringify(ts)); render(); }
 
-    function render(){
-      buildEmployeeOptions();
-      let list = tasks.slice();
+    function populateEmployees(){ const all = Array.from(new Set(tasks.map(t=>t.employee).filter(Boolean))).sort((a,b)=>a.localeCompare(b)); const sel = employeeFilter.value || '__all'; employeeFilter.innerHTML = '<option value="__all">All employees</option>'; all.forEach(emp=>{ const opt = document.createElement('option'); opt.value = emp; opt.textContent = emp; employeeFilter.appendChild(opt); }); if([...employeeFilter.options].some(o=>o.value===sel)) employeeFilter.value = sel; }
 
-      const emp = employeeFilter.value;
-      const prio = priorityFilter.value;
-      const sortBy = sortSelect.value;
+    exportCsvBtn.addEventListener('click', ()=>{ if(tasks.length===0) return alert('No tasks to export.'); const rows = [['id','employee','description','dueDate','priority','completed','createdAt','updatedAt','completedAt']]; tasks.forEach(t=> rows.push([t.id,t.employee,t.description,t.dueDate||'',t.priority||'Medium', t.completed?'TRUE':'FALSE', t.createdAt, t.updatedAt, t.completedAt||''])); const csv = rows.map(r=> r.map(cell=> '"'+String(cell).replace(/"/g,'""')+'"').join(',')).join('\r\n'); const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'tasks_export.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); });
 
-      if(emp && emp !== '__all') list = list.filter(t=> t.employee === emp);
-      if(prio && prio !== '__all') list = list.filter(t=> t.priority === prio);
+    importSampleBtn.addEventListener('click', ()=>{
+      const sample = [
+        {id:uid(), employee:'Amit Kumar', description:'Prepare weekly report', dueDate:new Date(Date.now()+2*86400000).toISOString(), priority:'High', completed:false, createdAt:nowISO(), updatedAt:nowISO(), completedAt:null},
+        {id:uid(), employee:'Priya Sharma', description:'Update inventory list', dueDate:new Date(Date.now()+5*86400000).toISOString(), priority:'Medium', completed:false, createdAt:nowISO(), updatedAt:nowISO(), completedAt:null},
+        {id:uid(), employee:'Aman', description:'Call supplier', dueDate:null, priority:'Low', completed:true, createdAt:nowISO(), updatedAt:nowISO(), completedAt:nowISO()}
+      ]; tasks = sample.concat(tasks); saveTasks(tasks);
+    });
 
-      list.sort((a,b)=>{
-        if(sortBy === 'dueAsc'){
-          if(!a.dueDate && !b.dueDate) return priorityOrder(a.priority) - priorityOrder(b.priority);
-          if(!a.dueDate) return 1;
-          if(!b.dueDate) return -1;
-          const d = new Date(a.dueDate) - new Date(b.dueDate);
-          if(d !== 0) return d;
-          return priorityOrder(a.priority) - priorityOrder(b.priority);
-        } else if(sortBy === 'dueDesc'){
-          if(!a.dueDate && !b.dueDate) return priorityOrder(b.priority) - priorityOrder(a.priority);
-          if(!a.dueDate) return 1;
-          if(!b.dueDate) return -1;
-          return new Date(b.dueDate) - new Date(a.dueDate);
-        } else {
-          return priorityOrder(a.priority) - priorityOrder(b.priority);
-        }
-      });
-
-      board.innerHTML = '';
-      if(list.length === 0){
-        board.innerHTML = '<div class=\"card empty\">No tasks found</div>';
-      } else {
-        list.forEach(t => {
-          const el = document.createElement('div');
-          el.className = 'task';
-          el.innerHTML = `
-            <div class="left">
-              <div style="font-weight:700">${escapeHtml(t.description)}</div>
-              <div style="margin-top:6px">
-                <span class="pill">${escapeHtml(t.employee)}</span>
-                <span style="margin-left:8px" class="${t.priority==='High'? 'prio-high' : t.priority==='Medium' ? 'prio-med' : 'prio-low'}" >${escapeHtml(t.priority||'Medium')}</span>
-                ${t.dueDate ? `<span style="margin-left:12px" class="small">Due: ${fmt(t.dueDate)}</span>` : ''}
-              </div>
-              <div class="meta">${t.note ? escapeHtml(t.note) : ''}</div>
-            </div>
-            <div class="small" style="white-space:nowrap">${t.completed ? '✔ Completed' : ''}</div>
-          `;
-          board.appendChild(el);
-        });
-      }
-
-      summary.textContent = `${tasks.length} total • ${tasks.filter(t=>!t.completed).length} open`;
-    }
-
-    function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[m])); }
-
-    refreshBtn.addEventListener('click', ()=> load());
     employeeFilter.addEventListener('change', render);
     priorityFilter.addEventListener('change', render);
     sortSelect.addEventListener('change', render);
+    groupByEmployeeCheckbox.addEventListener('change', render);
 
-    // auto-refresh every 12s so viewers see updates quickly after you save tasks.json
-    setInterval(load, 12000);
+    function sortTasks(list, mode){
+      switch(mode){
+        case 'dueAsc':
+          list.sort((a,b)=>{
+            if(!a.dueDate && !b.dueDate) return (a.priorityOrder||0) - (b.priorityOrder||0);
+            if(!a.dueDate) return 1;
+            if(!b.dueDate) return -1;
+            // same date -> priority
+            const diff = new Date(a.dueDate) - new Date(b.dueDate);
+            if(diff !== 0) return diff;
+            return priorityOrder(b.priority) - priorityOrder(a.priority);
+          }); break;
+        case 'dueDesc':
+          list.sort((a,b)=>{
+            if(!a.dueDate && !b.dueDate) return priorityOrder(b.priority) - priorityOrder(a.priority);
+            if(!a.dueDate) return 1;
+            if(!b.dueDate) return -1;
+            const diff = new Date(b.dueDate) - new Date(a.dueDate);
+            if(diff !== 0) return diff;
+            return priorityOrder(b.priority) - priorityOrder(a.priority);
+          }); break;
+        case 'priority':
+          list.sort((a,b)=> priorityOrder(a.priority) - priorityOrder(b.priority) || new Date(a.createdAt) - new Date(b.createdAt));
+          break;
+        case 'employee':
+          list.sort((a,b)=> a.employee.localeCompare(b.employee) || new Date(a.dueDate||0) - new Date(b.dueDate||0));
+          break;
+        case 'createdDesc':
+          list.sort((a,b)=> new Date(b.createdAt) - new Date(a.createdAt)); break;
+        default: break;
+      }
+    }
 
-    load();
+    function priorityOrder(p){ if(!p) return 2; if(p==='High') return 0; if(p==='Medium') return 1; return 2; }
+
+    function render(){
+      populateEmployees();
+      const filterEmp = employeeFilter.value;
+      const filterPrio = priorityFilter.value;
+      const sortBy = sortSelect.value;
+      const groupByEmployee = groupByEmployeeCheckbox.checked;
+
+      let list = tasks.slice();
+      if(filterEmp && filterEmp !== '__all') list = list.filter(t=> t.employee === filterEmp);
+      if(filterPrio && filterPrio !== '__all') list = list.filter(t=> t.priority === filterPrio);
+
+      // attach convenience order value
+      list.forEach(t=> t.priorityOrder = priorityOrder(t.priority));
+
+      sortTasks(list, sortBy);
+
+      taskListEl.innerHTML = '';
+      if(list.length === 0){ taskListEl.innerHTML = '<div class="small">No tasks to show.</div>'; }
+      else {
+        if(groupByEmployee){
+          const groups = {};
+          list.forEach(t=>{ groups[t.employee] = groups[t.employee] || []; groups[t.employee].push(t); });
+          Object.keys(groups).sort().forEach(emp=>{
+            const container = document.createElement('div'); container.className = 'group';
+            const title = document.createElement('div'); title.className = 'group-title'; title.textContent = emp + ` (${groups[emp].length})`;
+            container.appendChild(title);
+            groups[emp].forEach(t=> container.appendChild(renderTaskElement(t)));
+            taskListEl.appendChild(container);
+          });
+        } else {
+          list.forEach(t=> taskListEl.appendChild(renderTaskElement(t)));
+        }
+      }
+
+      const total = tasks.length;
+      const openCount = tasks.filter(t=>!t.completed).length;
+      const lastCompleted = tasks.filter(t=>t.completedAt).sort((a,b)=> new Date(b.completedAt)-new Date(a.completedAt))[0];
+      summary.textContent = `${total} task(s) — ${openCount} open${lastCompleted ? ' — last completed: ' + formatDateISO(lastCompleted.completedAt) : ''}`;
+    }
+
+    function renderTaskElement(t){
+      const el = document.createElement('div'); el.className = 'task' + (t.completed ? ' completed' : '');
+      el.innerHTML = `
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <input type="checkbox" ${t.completed ? 'checked' : ''} aria-label="Mark task complete" />
+        </div>
+        <div class="task-left">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div style="font-weight:700">${escapeHtml(t.description)}</div>
+            <div class="pill">${escapeHtml(t.employee)}</div>
+            <div class="priority-pill ${t.priority==='High' ? 'prio-high' : t.priority==='Medium' ? 'prio-med' : 'prio-low'}">${escapeHtml(t.priority || 'Medium')}</div>
+            ${t.dueDate ? `<div class="small">Due: ${formatDateISO(t.dueDate)}</div>` : ''}
+          </div>
+          <div class="task-meta small">
+            <div>Created: ${formatDateISO(t.createdAt)}</div>
+            <div>Updated: ${formatDateISO(t.updatedAt)}</div>
+            ${t.completedAt ? `<div>Completed: ${formatDateISO(t.completedAt)}</div>` : ''}
+          </div>
+        </div>
+        <div class="actions" aria-hidden="true">
+          <button class="ghost" data-action="edit">Edit</button>
+          <button class="ghost" data-action="delete">Delete</button>
+        </div>
+      `;
+      const cb = el.querySelector('input[type="checkbox"]'); cb.addEventListener('change', ()=> toggleComplete(t.id));
+      el.querySelector('[data-action="delete"]').addEventListener('click', ()=> deleteTask(t.id));
+      el.querySelector('[data-action="edit"]').addEventListener('click', ()=> editTask(t.id));
+      return el;
+    }
+
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    // initial render
+    render();
   </script>
 </body>
 </html>
